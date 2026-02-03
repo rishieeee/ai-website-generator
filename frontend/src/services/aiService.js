@@ -241,7 +241,8 @@ function validateGeneratedCode(code) {
  */
 function parseAIResponse(response) {
     if (!response || typeof response !== 'string') {
-        throw new Error('Empty or invalid AI response');
+        console.warn('Empty or invalid AI response, using fallback');
+        return null;
     }
 
     let content = response.trim();
@@ -258,22 +259,61 @@ function parseAIResponse(response) {
 
     content = content.trim();
 
-    // Try to parse as JSON
+    // Strategy 1: Direct JSON parse
     try {
         return JSON.parse(content);
     } catch (e) {
-        // Try to find JSON object in the response
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            try {
-                return JSON.parse(jsonMatch[0]);
-            } catch (e2) {
-                throw new Error('Failed to parse JSON from AI response');
+        console.log('Direct parse failed, trying alternative strategies...');
+    }
+
+    // Strategy 2: Find JSON object with balanced braces
+    try {
+        let braceCount = 0;
+        let startIdx = -1;
+        let endIdx = -1;
+
+        for (let i = 0; i < content.length; i++) {
+            if (content[i] === '{') {
+                if (startIdx === -1) startIdx = i;
+                braceCount++;
+            } else if (content[i] === '}') {
+                braceCount--;
+                if (braceCount === 0 && startIdx !== -1) {
+                    endIdx = i + 1;
+                    break;
+                }
             }
         }
-        throw new Error('No valid JSON found in AI response');
+
+        if (startIdx !== -1 && endIdx !== -1) {
+            const jsonStr = content.slice(startIdx, endIdx);
+            return JSON.parse(jsonStr);
+        }
+    } catch (e) {
+        console.log('Balanced brace extraction failed');
     }
+
+    // Strategy 3: Extract individual fields using regex
+    try {
+        const htmlMatch = content.match(/"html"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+        const cssMatch = content.match(/"css"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+        const jsMatch = content.match(/"js"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+
+        if (htmlMatch && cssMatch) {
+            return {
+                html: htmlMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\'),
+                css: cssMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\'),
+                js: jsMatch ? jsMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\') : ''
+            };
+        }
+    } catch (e) {
+        console.log('Field extraction failed');
+    }
+
+    console.warn('All parsing strategies failed');
+    return null;
 }
+
 
 /**
  * Validates and sanitizes user prompt
@@ -342,16 +382,8 @@ export async function generateWebsite(userPrompt) {
 
     } catch (error) {
         console.error('AI generation error:', error);
-
-        // Return fallback for recoverable errors
-        if (error.message.includes('rate limit') ||
-            error.message.includes('timeout') ||
-            error.message.includes('network')) {
-            console.warn('Using fallback due to service error');
-            return FALLBACK_CODE;
-        }
-
-        throw error;
+        console.warn('Using fallback due to error');
+        return FALLBACK_CODE;
     }
 }
 
