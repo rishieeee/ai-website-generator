@@ -50,12 +50,19 @@ async def global_exception_handler(request: Request, exc: Exception):
         }
     )
 
+
 origins = [
     "http://localhost:5173",
     "http://localhost:3000",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:3000",
 ]
+
+# Add production origins from environment variable
+import os
+prod_origins = os.getenv("CORS_ORIGINS", "").split(",")
+if prod_origins:
+    origins.extend([origin.strip() for origin in prod_origins if origin.strip()])
 
 app.add_middleware(
     CORSMiddleware,

@@ -322,7 +322,7 @@ uvicorn app.main:app --reload --port 8000
 cd frontend
 
 # Install dependencies
-npm install
+ 
 
 # Start dev server
  

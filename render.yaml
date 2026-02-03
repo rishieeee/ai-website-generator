@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: ai-website-generator-backend
+    env: docker
+    region: singapore
+    plan: free
+    branch: main
+    rootDir: backend
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_NAME
+        value: ai_website_generator
+      - key: PORT
+        value: 8000
+      - key: MONGODB_URL
+        sync: false
